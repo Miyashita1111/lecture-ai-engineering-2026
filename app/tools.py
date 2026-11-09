@@ -5,10 +5,14 @@
 """
 
 import json
+import random
+from datetime import datetime
 from functools import cache
 from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+# 第3回 宿題（実装）: 学習の記録の保存先。個人の記録なので .gitignore で除外している
+LOG_DIR = Path(__file__).resolve().parent.parent / "learning_log"
 MAX_RESULTS = 3
 
 
@@ -77,3 +81,45 @@ def get_lecture_summary(lecture: int) -> str:
         available = sorted(p.stem for p in (DATA_DIR / "lectures").glob("*.md"))
         return f"第{lecture}回の要点はまだありません。用意されている回: {', '.join(available)}"
     return path.read_text(encoding="utf-8")
+
+
+def make_quiz(lecture: int) -> str:
+    """指定した回（1始まりの整数）の用語集から1語を選び、確認問題と答えを返す。
+
+    「第2回の確認問題を出して」「復習のクイズがほしい」のように、
+    理解度を確かめる問題を求められたときに使う。用語の意味を説明するだけなら search_glossary を使う。
+    """
+    candidates = [e for e in load_glossary() if e["lecture"] == lecture]
+    if not candidates:
+        available = sorted({e["lecture"] for e in load_glossary()})
+        return f"第{lecture}回の用語は用語集にありません。用語がある回: {', '.join(map(str, available))}"
+    entry = random.choice(candidates)
+    return json.dumps(
+        {
+            "lecture": lecture,
+            "question": f"「{entry['term']}」とはどのような意味ですか？",
+            "answer": entry["definition"],
+        },
+        ensure_ascii=False,
+    )
+
+
+def save_learning_log(title: str, content: str) -> str:
+    """学習の記録を Markdown ファイルとして learning_log/ に保存する。
+
+    利用者が「今日の学びを記録して」「メモを残して」のように、記録の保存をはっきり頼んだときだけ使う。
+    title には記録の短い見出し、content には保存する本文（学んだこと・疑問など）を入れる。
+    ファイルを書き込む操作なので、実行の前に利用者の確認を求める。
+    """
+    if not title.strip() or not content.strip():
+        return "title と content は空にできません。"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    now = datetime.now()
+    # ファイル名に title を使わない（../ などでフォルダの外に書かれないようにするため）
+    path = LOG_DIR / f"{now:%Y%m%d-%H%M%S}.md"
+    n = 2
+    while path.exists():  # 同じ秒に2回保存しても上書きしない
+        path = LOG_DIR / f"{now:%Y%m%d-%H%M%S}-{n}.md"
+        n += 1
+    path.write_text(f"# {title.strip()}\n\n- 日時: {now:%Y-%m-%d %H:%M}\n\n{content.strip()}\n", encoding="utf-8")
+    return f"保存しました: learning_log/{path.name}"
