@@ -46,3 +46,33 @@ def test_default_question_of_lecture1_is_answerable_from_glossary():
     assert "3レベル" in DEFAULT_QUESTION
     hits = json.loads(tools.search_glossary("3レベル"))
     assert hits[0]["term"] == "宿題の3レベル"
+
+
+# --- 第3回: make_quiz / save_learning_log ---
+
+
+def test_make_quiz_uses_a_term_from_the_lecture():
+    quiz = json.loads(tools.make_quiz(2))
+    lecture2 = {t["definition"] for t in tools.load_glossary() if t["lecture"] == 2}
+    assert quiz["lecture"] == 2
+    assert quiz["question"]
+    assert quiz["answer"] in lecture2
+
+
+def test_make_quiz_unknown_lecture_lists_available():
+    assert "用語がある回" in tools.make_quiz(99)
+
+
+def test_save_learning_log_writes_inside_log_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools, "LOG_DIR", tmp_path / "learning_log")
+    first = tools.save_learning_log("../../etc/passwd", "LoRAは低ランク行列だけを学習する")
+    second = tools.save_learning_log("同じ秒", "上書きされない")
+    files = sorted((tmp_path / "learning_log").glob("*.md"))
+    assert len(files) == 2  # title がファイル名に使われず、同じ秒でも上書きしない
+    assert "保存しました" in first and "保存しました" in second
+    texts = [f.read_text(encoding="utf-8") for f in files]
+    assert any("LoRAは低ランク行列" in t for t in texts)
+
+
+def test_save_learning_log_rejects_empty():
+    assert "空にできません" in tools.save_learning_log(" ", "本文")
