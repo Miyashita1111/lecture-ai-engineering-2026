@@ -68,3 +68,30 @@ def test_judge_pipeline_with_fake_model():
     assert summary["coverage"]["covered"] + len({r["id"] for r in summary["review"]}) == 10
     for m in summary["mismatches"]:
         assert m["kind"] in ("見逃し", "過検出")
+
+
+# --- 第4回 宿題（基礎）: 判定の順序を入れ替える ---
+
+
+def test_verdict_first_swaps_field_order_in_schema():
+    reason_first = list(judge.CriterionVerdict.model_json_schema()["properties"])
+    verdict_first = list(judge.CriterionVerdictFirst.model_json_schema()["properties"])
+    assert reason_first == ["reason", "verdict"]
+    assert verdict_first == ["verdict", "reason"]
+
+
+def test_verdict_first_pipeline_with_fake_model():
+    cases = read_jsonl(DEFAULT_CASES)
+    rubric = DEFAULT_RUBRIC.read_text(encoding="utf-8")
+    normal = judge_cases(build_judge(build_test_model(), rubric), cases)
+    swapped = judge_cases(build_judge(build_test_model(), rubric, verdict_first=True), cases)
+    assert swapped == normal  # 偽モデルは順序に関係なく同じ規則で判定するので、集計の配線だけを確かめる
+
+
+def test_verdict_first_rewrites_order_in_rubric():
+    rubric = DEFAULT_RUBRIC.read_text(encoding="utf-8")
+    assert "先に理由を書いてから判定を決める" in rubric
+    text = judge.judge_instructions(rubric, verdict_first=True)
+    assert "先に理由を書いてから判定を決める" not in text
+    assert "先に判定を決めてから理由を書く" in text
+    assert "先に理由を書いてから判定を決める" in judge.judge_instructions(rubric)  # 既定は変えない
