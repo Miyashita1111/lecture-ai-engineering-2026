@@ -86,3 +86,12 @@ def test_verdict_first_pipeline_with_fake_model():
     normal = judge_cases(build_judge(build_test_model(), rubric), cases)
     swapped = judge_cases(build_judge(build_test_model(), rubric, verdict_first=True), cases)
     assert swapped == normal  # 偽モデルは順序に関係なく同じ規則で判定するので、集計の配線だけを確かめる
+
+
+def test_verdict_first_rewrites_order_in_rubric():
+    rubric = DEFAULT_RUBRIC.read_text(encoding="utf-8")
+    assert "先に理由を書いてから判定を決める" in rubric
+    text = judge.judge_instructions(rubric, verdict_first=True)
+    assert "先に理由を書いてから判定を決める" not in text
+    assert "先に判定を決めてから理由を書く" in text
+    assert "先に理由を書いてから判定を決める" in judge.judge_instructions(rubric)  # 既定は変えない

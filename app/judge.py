@@ -132,19 +132,29 @@ def judge_prompt(case: dict) -> str:
     return f"# 質問\n{case['question']}\n\n# 回答\n{case['answer']}\n\n# 参照\n{reference_text(case)}"
 
 
-def build_judge(model, rubric: str, verdict_first: bool = False) -> Agent:
+def judge_instructions(rubric: str, verdict_first: bool = False) -> str:
+    """採点者への指示（rubric.md ＋ 出力の形式）を作る。"""
     if verdict_first:
-        # 第4回 宿題（基礎）: 出力の型と、形式の指示の両方を「判定→理由」にそろえる
+        # 第4回 宿題（基礎）: 形式の指示を「判定→理由」にする。rubric.md の「採点のしかた」にも
+        # 順序が書いてあるので、そこも入れ替えて指示が食い違わないようにする
         order = "verdict を pass / fail / unsure のどれかに先に決め、そのあとで reason（理由）を書いてください。"
-        output_type = JudgeResultVerdictFirst
+        rubric = rubric.replace("先に理由を書いてから判定を決める", "先に判定を決めてから理由を書く")
     else:
         order = "reason（理由）を先に書き、そのあとで verdict を pass / fail / unsure のどれかにしてください。"
-        output_type = JudgeResult
-    instructions = rubric + (
+    return rubric + (
         "\n\n# 出力の形式\n"
         f"4 つの基準（grounding, scope, hint, clarity）それぞれについて、{order}"
     )
-    return Agent(model, output_type=output_type, instructions=instructions, model_settings={"temperature": 0.0})
+
+
+def build_judge(model, rubric: str, verdict_first: bool = False) -> Agent:
+    output_type = JudgeResultVerdictFirst if verdict_first else JudgeResult
+    return Agent(
+        model,
+        output_type=output_type,
+        instructions=judge_instructions(rubric, verdict_first),
+        model_settings={"temperature": 0.0},
+    )
 
 
 def build_llm_model(model_name: str) -> GoogleModel:
