@@ -14,7 +14,6 @@ from app import tools
 from app.agent import agent, run_with_approval
 
 BASE_TOOLS = {"search_glossary", "get_lecture_summary"}
-APPROVAL_TOOLS = {"save_learning_log"}
 
 
 def _parts(result, kind):
@@ -31,9 +30,9 @@ def test_base_tools_are_registered_and_called():
 
     called = {p.tool_name for p in _parts(result, ToolCallPart)}
     assert BASE_TOOLS <= called
-    # 承認が必要なツール（第3回 宿題）は承認待ちで止まり、結果が返らないので数えない
-    immediate_calls = [p for p in _parts(result, ToolCallPart) if p.tool_name not in APPROVAL_TOOLS]
-    assert len(_parts(result, ToolReturnPart)) == len(immediate_calls)
+    # 承認が必要なツール（requires_approval=True）は、実行されずに承認待ちになるので戻り値が無い
+    waiting = len(result.output.approvals) if isinstance(result.output, DeferredToolRequests) else 0
+    assert len(_parts(result, ToolReturnPart)) + waiting == len(_parts(result, ToolCallPart))
     assert result.output
 
 
